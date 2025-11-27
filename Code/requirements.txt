@@ -1,0 +1,33 @@
+# Core
+numpy
+pandas
+matplotlib
+opencv-python
+pillow
+scipy
+sympy
+
+# PyTorch (GPU; CUDA 12.1)
+torch==2.2.0+cu121
+torchvision==0.17.0+cu121
+torchaudio==2.2.0+cu121
+--extra-index-url https://download.pytorch.org/whl/cu121
+
+# Pose Estimation
+transformers==4.39.0
+ultralytics
+spinepose
+onnxruntime-gpu
+hf_transfer
+
+# Tracking
+supervision
+deep_sort_realtime
+
+# Acceleration
+accelerate
+safetensors
+
+# Tools
+tqdm
+python-dotenv

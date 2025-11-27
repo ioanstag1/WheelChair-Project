@@ -1,0 +1,129 @@
+import os
+import cv2
+import pandas as pd
+import subprocess
+from datetime import datetime
+from pathlib import Path
+
+# ========= EDIT THESE =========
+CSV_PATH   = "/mnt/gdrive/Wheelchair_Project/PB_selected_videos/target_ids.csv"
+ROOT_DIR   = "/mnt/gdrive/Wheelchair_Project/PB_selected_videos"          # where relative_path points to
+SCRIPT_PATH= "/root/WheelchairPose/vit_spine_new.py"        # your script
+OUT_ROOT   = "/mnt/gdrive/Wheelchair_Project/13_10/VitSpineXLSmoothed"
+POSE_MODEL = "usyd-community/vitpose-plus-huge"
+YOLO_MODEL = "yolo11x.pt"
+TRACKER    = "bytetrack.yaml"
+# ==============================
+
+def can_open_video(path:str) -> bool:
+    cap = cv2.VideoCapture(path)
+    ok = cap.isOpened()
+    if ok:
+        ok, _ = cap.read()
+    cap.release()
+    return ok
+
+def norm_side(side:str, video_name:str) -> str:
+    """Use CSV value if valid; else fallback: *S.avi -> left, *F.avi -> all."""
+    v = (side or "").strip().lower()
+    if v in {"left", "right", "all"}:
+        return v
+    name = video_name.upper()
+    if name.endswith("S.AVI"): return "left"
+    if name.endswith("F.AVI"): return "all"
+    return "all"
+
+# sanity checks
+for p in [CSV_PATH, ROOT_DIR, SCRIPT_PATH, OUT_ROOT]:
+    if p == SCRIPT_PATH:
+        if not os.path.exists(p):
+            raise FileNotFoundError(f"Script not found: {p}")
+    else:
+        os.makedirs(OUT_ROOT, exist_ok=True)
+
+df = pd.read_csv(CSV_PATH)
+
+runs = []
+ok_count = 0
+fail_count = 0
+
+for i, row in df.iterrows():
+    participant   = str(row["participant"])
+    video_name    = str(row["video_name"])
+    relative_path = str(row["relative_path"])
+    side          = norm_side(row.get("side", ""), video_name)
+
+    # parse target_id safely (CSV can sometimes be float)
+    tid_raw = row.get("target_id", "")
+    try:
+        target_id = int(float(tid_raw))
+    except Exception:
+        print(f"❌ Row {i}: invalid target_id={tid_raw!r} for {video_name}, skipping.")
+        fail_count += 1
+        continue
+
+    video_path = str(Path(ROOT_DIR) / relative_path)
+    if not os.path.exists(video_path):
+        print(f"❌ Missing file: {video_path}")
+        fail_count += 1
+        continue
+    if not can_open_video(video_path):
+        print(f"❌ OpenCV cannot read: {video_path}")
+        fail_count += 1
+        continue
+
+    out_dir = str(Path(OUT_ROOT) / participant / Path(video_name).stem)
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        "python3", SCRIPT_PATH,
+        "--input", video_path,
+        "--target-id", str(target_id),
+        "--pose-model", POSE_MODEL,
+        "--out-dir", out_dir,
+        "--side", side,
+        "--yolo-model", YOLO_MODEL,
+        "--tracker", TRACKER,
+        # You can add overrides if you want (kept minimal to match your working setup)
+        # "--imgsz", "1280",
+        # "--conf", "0.25",
+        # "--kp-thr", "0.30",
+        # "--smooth",      # vit_spine.py defaults True in your code; omit if you keep that default
+    ]
+
+    print(f"\n🚀 [{i+1}/{len(df)}] {participant}/{video_name} | id={target_id} | side={side}")
+    print("↪️", " ".join(cmd))
+
+    # Run and log
+    result = subprocess.run(cmd, text=True, capture_output=True)
+    rc = result.returncode
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = Path(out_dir) / f"run_{ts}.log"
+    with open(log_path, "w") as f:
+        f.write("COMMAND:\n" + " ".join(cmd) + "\n\n")
+        f.write(f"RETURN CODE: {rc}\n\n")
+        f.write("STDOUT:\n" + (result.stdout or "") + "\n\n")
+        f.write("STDERR:\n" + (result.stderr or "") + "\n")
+
+    if rc == 0:
+        ok_count += 1
+        print(f"✅ OK | log: {log_path}")
+    else:
+        fail_count += 1
+        print(f"⚠️ FAIL rc={rc} | log: {log_path}")
+
+    runs.append({
+        "participant": participant,
+        "video_name": video_name,
+        "relative_path": relative_path,
+        "target_id": target_id,
+        "side": side,
+        "return_code": rc,
+        "log_path": str(log_path),
+    })
+
+# Save a small summary CSV next to OUT_ROOT
+summary_csv = Path(OUT_ROOT) / "batch_summary.csv"
+pd.DataFrame(runs).to_csv(summary_csv, index=False)
+print(f"\n📊 Done. OK={ok_count}, FAIL={fail_count}")
+print(f"📝 Summary: {summary_csv}")
