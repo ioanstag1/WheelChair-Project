@@ -17,6 +17,33 @@ from transformers import AutoProcessor, VitPoseForPoseEstimation
 from spinepose import SpinePoseEstimator
 from spinepose.tools.smoothing import KeypointSmoothing
 
+
+# =============================================================================
+# ACKNOWLEDGMENTS & REFERENCES
+# =============================================================================
+# This script utilizes the following open-source models and libraries:
+#
+# 1. Ultralytics YOLO (Detection & Tracking)
+#    - Repository: https://github.com/ultralytics/ultralytics
+#    - Citation: Jocher, G. et al. (2021). Ultralytics YOLO.
+#
+# 2. ViTPose+ (Human Pose Estimation)
+#    - Model: usyd-community/vitpose-plus-base (via Hugging Face)
+#    - Repository: https://github.com/ViTAE-Transformer/ViTPose
+#    - Citation:
+#      Xu, Yufei, et al. "ViTPose+: Vision Transformer Foundation Model for Generic
+#      Body Pose Estimation." arXiv preprint arXiv:2212.04246 (2022).
+#
+# 3. SpinePose (Spine Keypoint Estimation)
+#    - Repository: https://github.com/dfki-av/spinepose.git
+#    - Citation:
+#      Khan, M. S. U., Krauß, S., & Stricker, D. (2025). "Towards Unconstrained
+#      2D Pose Estimation of the Human Spine." Proceedings of the IEEE/CVF
+#      Conference on Computer Vision and Pattern Recognition (CVPR) Workshops,
+#      pp. 6171-6180.
+# =============================================================================
+
+
 # ===========================
 # Determinism utilities
 # ===========================
